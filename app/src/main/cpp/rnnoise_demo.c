@@ -15,6 +15,7 @@
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_Android.h>
 
+#include <math.h>
 #include <stdio.h>
 #include <zconf.h>
 #include "rnnoise.h"
@@ -25,17 +26,14 @@
 
 JNIEXPORT jboolean JNICALL
 Java_com_example_myapplication_MainActivity_rnnoise_1demo(JNIEnv *env, jclass type,jobject inputF, jstring inputFName) {
-
-    /*
-    string a = "hello ";
-    const char *b = "world";
-    string c = a + b;
-    const char *C = c.c_str();*/
+    ///Bizim Algoritma Karesi => "Exit Point => NOISY : 4059.437211 ||| CLEAR : 3909.596673 ||| PERCENTAGE : 96.308835"
+    ///Bizim Algoritma        => "Exit Point => NOISY : 4501.080858 ||| CLEAR : 4060.160638 ||| PERCENTAGE : 90.204126"
+    ///Audacity Algoritması   => "Exit Point => NOISY : 17478.195631 ||| CLEAR : 12282.904722 ||| PERCENTAGE : 70.275588"
 
 
     const char *filename = (*env)->GetStringUTFChars(env, inputFName, NULL);
-    char inputFileExt[] = "input.wav";
-    char outputFileExt[] = "outpu.wav";
+    char inputFileExt[] = "output.pcm";
+    char outputFileExt[] = "new_output.pcm";
     char *inputFile = malloc(sizeof(char) * 1024);
     char *outputFile = malloc(sizeof(char) * 1024);
     assert(NULL != filename);
@@ -49,6 +47,10 @@ Java_com_example_myapplication_MainActivity_rnnoise_1demo(JNIEnv *env, jclass ty
     __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "Entry Point %s", inputFile);
     __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "Entry Point %s", outputFile);
 
+
+    double SUM_NOISY_SOUND = 0;
+    double SUM_CLEAR_SOUND = 0;
+    double COUNTER = 0;
 
 
     int i;
@@ -66,9 +68,17 @@ Java_com_example_myapplication_MainActivity_rnnoise_1demo(JNIEnv *env, jclass ty
         fread(tmp, sizeof(short), FRAME_SIZE, f1);
         //__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "2.While");
         if (feof(f1)) break;
-        for (i = 0; i < FRAME_SIZE; i++) x[i] = tmp[i];
+        for (i = 0; i < FRAME_SIZE; i++){
+            x[i] = tmp[i];
+            SUM_NOISY_SOUND += tmp[i]*tmp[i];
+            COUNTER++;
+        }
         rnnoise_process_frame(st, x, x);
-        for (i = 0; i < FRAME_SIZE; i++) tmp[i] = x[i];
+        for (i = 0; i < FRAME_SIZE; i++){
+            //SUM_CLEAR_SOUND += (tmp[i]-x[i]) * (tmp[i]-x[i]);
+            SUM_CLEAR_SOUND += x[i]*x[i];
+            tmp[i] = x[i];
+        }
         if (!first) fwrite(tmp, sizeof(short), FRAME_SIZE, fout);
         first = 0;
     }
@@ -77,7 +87,12 @@ Java_com_example_myapplication_MainActivity_rnnoise_1demo(JNIEnv *env, jclass ty
     fclose(f1);
     fclose(fout);
 
-    __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "Exit Point");
+
+    SUM_NOISY_SOUND = sqrt(SUM_NOISY_SOUND/COUNTER);
+    SUM_CLEAR_SOUND = sqrt(SUM_CLEAR_SOUND/COUNTER);
+    double PERCENTAGE = (SUM_CLEAR_SOUND/SUM_NOISY_SOUND)*100;
+
+    __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "Exit Point => NOISY : %lf ||| CLEAR : %lf ||| PERCENTAGE : %lf", SUM_NOISY_SOUND, SUM_CLEAR_SOUND, PERCENTAGE);
 
 
 }
